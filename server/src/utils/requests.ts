@@ -26,7 +26,7 @@ const YAHOO_HEADERS = {
 // Sequential request queue: chains every Yahoo Finance call so they execute
 // one-at-a-time with a fixed delay between each.
 // ---------------------------------------------------------------------------
-const YAHOO_DELAY_MS = 600; // ms between consecutive requests
+const YAHOO_DELAY_MS = 100; // Faster delay to prevent Render timeouts
 let yahooQueue: Promise<void> = Promise.resolve();
 
 export function throttledYahooCall<T>(fn: () => Promise<T>): Promise<T> {
