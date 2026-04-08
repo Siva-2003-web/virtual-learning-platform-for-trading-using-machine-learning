@@ -1,73 +1,25 @@
-import { Express, Request, Response } from "express";
-import swaggerJsdoc from "swagger-jsdoc";
+import { Express } from "express";
 import swaggerUi from "swagger-ui-express";
-import swaggerAutogen from "swagger-autogen";
+import path from "path";
 const version = "1.0.0";
-import dotenv from "dotenv";
-dotenv.config();
 
-// const options = {
-// 	definition: {
-// 		openapi: "3.0.0",
-// 		info: {
-// 			title: "Stock Trading Simulator API",
-// 			version: version,
-// 			description: "A REST API for the Stock Trading Simulator",
-// 		},
-// components: {
-// 	securitySchemes: {
-// 		bearerAuth: {
-// 			type: "http",
-// 			scheme: "bearer",
-// 			bearerFormat: "JWT",
-// 		},
-// 	},
-// },
-// security: [
-// 	{
-// 		bearerAuth: [],
-// 	},
-// ],
-// 	},
-// };
-
-const outputFile = "./swagger-output.json";
-const endpointsFiles = [__dirname + "/../routes.ts"];
-
-function swaggerDocs(app: Express, port: number) {
-	const doc = {
-		info: {
-			title: "Stock Trading Simulator API",
-			description: "A REST API for the Stock Trading Simulator",
-			version,
-		},
-		host: "0.0.0.0:" + port,
-		securityDefinitions: {
-			bearerAuth: {
-				type: "http",
-				scheme: "bearer",
-				bearerFormat: "JWT",
-			},
-		},
-		servers: [
-			{ url: process.env.STOTRA_SERVER_URL || `http://0.0.0.0:${port}` },
-		],
-	};
-
-	const autogen = swaggerAutogen({
-		openapi: "3.0.0",
-		servers: [{ url: "/x" }],
-	})(outputFile, endpointsFiles, doc).then(() => {
-		const swaggerDocument = require("." + outputFile);
-		app.use(
-			"/api/docs",
-			swaggerUi.serve,
-			swaggerUi.setup(swaggerDocument, {
-				swaggerOptions: { persistAuthorization: true },
-			})
-		);
-		console.log(`Swagger docs available at http://0.0.0.0:${port}/api/docs`);
-	});
+export function swaggerDocs(app: Express, port: number) {
+	try {
+        // Enforce a static path for the generated swagger file
+        const swaggerFilePath = path.join(__dirname, "..", "swagger-output.json");
+        
+        // Try to require the file (it must exist in src for it to be moved to dist)
+        const swaggerDocument = require(swaggerFilePath);
+        
+        app.use(
+            "/api/docs",
+            swaggerUi.serve,
+            swaggerUi.setup(swaggerDocument, {
+                swaggerOptions: { persistAuthorization: true },
+            })
+        );
+        console.log(`[OK] Swagger docs loaded at http://localhost:${port}/api/docs`);
+    } catch (error) {
+        console.warn("[SKIP] Swagger documentation could not be loaded. (Normal in production)");
+    }
 }
-
-exports.swaggerDocs = swaggerDocs;
