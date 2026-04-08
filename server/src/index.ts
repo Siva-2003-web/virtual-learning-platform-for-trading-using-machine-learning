@@ -4,65 +4,54 @@ const { rateLimit } = require("express-rate-limit");
 import express from "express";
 import dotenv from "dotenv";
 dotenv.config();
-import yahooFinance from "yahoo-finance2";
 
 // Config/initialization
 const app = express();
-app.set("trust proxy", 1);
 
-// Suppress Yahoo Finance survey notices
-yahooFinance.suppressNotices(["yahooSurvey"]);
-try {
-	yahooFinance.setGlobalConfig({ validation: { logErrors: true, logOptionsErrors: false } });
-} catch (_) { }
-
-// Docs
-const { swaggerDocs } = require("./utils/swagger");
-
-// Database
-require("./utils/db");
-require("./models/user.model");
-
-// Explicit CORS - Universal Access
+// 1. ABSOLUTE TOP: Universal CORS Guard
 app.use(cors({
     origin: "*",
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    credentials: true,
+    preflightContinue: false,
+    optionsSuccessStatus: 204
 }));
+app.options("*", cors()); // Perfect pre-flight for all routes
 
+app.set("trust proxy", 1);
+
+// 2. Logging & Parsing
 app.use(morgan("tiny"));
 app.use(express.json());
 
-// Health Check
+// 3. Health Check (Instant response for Render)
 app.get("/", (req, res) => {
-    res.status(200).send({ status: "Stellix Systems Online", timestamp: new Date().toISOString() });
+    res.status(200).send({ status: "Stellix Systems Online", time: new Date().toISOString() });
 });
 
-// Ratelimiting
+// 4. Docs
+const { swaggerDocs } = require("./utils/swagger");
+
+// 5. Database & Models
+require("./utils/db");
+require("./models/user.model");
+
+// 6. Security & Rate Limiting (Moved down to avoid blocking health checks)
 const apiLimiter = rateLimit({
-	windowMs: 15 * 60 * 1000, // 15 minutes
-	max: 500, // Increased limit for production
+	windowMs: 15 * 60 * 1000,
+	max: 1000, // Very generous for testing
 	standardHeaders: true, 
 	legacyHeaders: false, 
 });
-
-const createAccountLimiter = rateLimit({
-	windowMs: 60 * 60 * 1000, // 1 hour
-	max: 10, 
-	message: "Too many accounts created from this IP, please try again after an hour",
-	standardHeaders: true, 
-	legacyHeaders: false, 
-});
-
 app.use("/api/", apiLimiter);
-app.use("/api/auth/signup", createAccountLimiter);
+
+// 7. REST Routes
+app.use(require("./routes"));
 
 const PORT: number = parseInt(process.env.PORT || "3010");
 
-// REST Routes
-app.use(require("./routes"));
-
 app.listen(PORT, () => {
-	console.log(`Server listening on port ${PORT}`);
+	console.log(`[🚀] Stellix Server Active on Port ${PORT}`);
 	swaggerDocs(app, PORT);
 });
