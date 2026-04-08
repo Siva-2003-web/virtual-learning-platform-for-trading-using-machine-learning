@@ -23,10 +23,20 @@ const { swaggerDocs } = require("./utils/swagger");
 require("./utils/db");
 require("./models/user.model");
 
-// Middleware
-app.use(cors());
+// Explicit CORS - Universal Access
+app.use(cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+}));
+
 app.use(morgan("tiny"));
 app.use(express.json());
+
+// Health Check
+app.get("/", (req, res) => {
+    res.status(200).send({ status: "Stellix Systems Online", timestamp: new Date().toISOString() });
+});
 
 // Ratelimiting
 const apiLimiter = rateLimit({
