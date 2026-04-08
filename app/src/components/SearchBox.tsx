@@ -13,6 +13,7 @@ import {
 	InputLeftElement,
 	InputGroup,
 	Box,
+	Spinner,
 } from "@chakra-ui/react";
 import { useLocation, useNavigate } from "react-router-dom";
 import api from "../services/api.service";
@@ -71,7 +72,7 @@ function SearchBox() {
 					setResults(res.data);
 				})
 				.catch(() => {
-					setResults([]);
+					setResults([] as any);
 				});
 		}, 300);
 
