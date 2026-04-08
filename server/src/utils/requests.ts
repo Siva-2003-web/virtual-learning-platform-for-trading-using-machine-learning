@@ -1,32 +1,21 @@
 import yahooFinance from "yahoo-finance2";
 import Cache from "node-cache";
 import axios from "axios";
-
-const stockCache = new Cache({ stdTTL: 5 * 60 }); // 5 minutes
-// Secondary stale cache – keeps values for 1 hour so we can serve them when
-// Yahoo rate-limits us (HTTP 429).
-const staleCache = new Cache({ stdTTL: 60 * 60 });
-
 import dotenv from "dotenv";
 dotenv.config();
 
-// ---------------------------------------------------------------------------
-// Browser-like headers so Yahoo doesn't immediately flag us as a bot.
-// ---------------------------------------------------------------------------
+const stockCache = new Cache({ stdTTL: 5 * 60 });
+const staleCache = new Cache({ stdTTL: 60 * 60 });
+
 const YAHOO_HEADERS = {
-	"User-Agent":
-		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+	"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 	Accept: "application/json, text/plain, */*",
 	"Accept-Language": "en-US,en;q=0.9",
 	Referer: "https://finance.yahoo.com/",
 	Origin: "https://finance.yahoo.com",
 };
 
-// ---------------------------------------------------------------------------
-// Sequential request queue: chains every Yahoo Finance call so they execute
-// one-at-a-time with a fixed delay between each.
-// ---------------------------------------------------------------------------
-const YAHOO_DELAY_MS = 100; // Faster delay to prevent Render timeouts
+const YAHOO_DELAY_MS = 100;
 let yahooQueue: Promise<void> = Promise.resolve();
 
 export function throttledYahooCall<T>(fn: () => Promise<T>): Promise<T> {
@@ -40,7 +29,6 @@ export function throttledYahooCall<T>(fn: () => Promise<T>): Promise<T> {
 	});
 }
 
-/** Return true when the error looks like a Yahoo 429 "Too Many Requests". */
 function isRateLimited(err: any): boolean {
 	if (!err) return false;
 	const msg = String(err.message || err);
@@ -52,146 +40,50 @@ function isRateLimited(err: any): boolean {
 	);
 }
 
-// ---------------------------------------------------------------------------
-// Retry helper with exponential backoff
-// ---------------------------------------------------------------------------
-async function withRetry<T>(
-	fn: () => Promise<T>,
-	label: string,
-	maxRetries: number = 2,
-): Promise<T> {
+async function withRetry<T>(fn: () => Promise<T>, label: string, maxRetries: number = 2): Promise<T> {
 	for (let attempt = 0; attempt <= maxRetries; attempt++) {
-		try {
-			return await fn();
-		} catch (err: any) {
+		try { return await fn(); } catch (err: any) {
 			if (isRateLimited(err) && attempt < maxRetries) {
-				const delay = Math.pow(2, attempt + 1) * 1000; // 2s, 4s, 8s
-				console.warn(
-					`[Retry] ${label} rate-limited, waiting ${delay}ms (attempt ${attempt + 1}/${maxRetries})`,
-				);
+				const delay = Math.pow(2, attempt + 1) * 1000;
 				await new Promise((r) => setTimeout(r, delay));
-			} else {
-				throw err;
-			}
+			} else { throw err; }
 		}
 	}
 	throw new Error("Max retries exceeded for " + label);
 }
 
-// ---------------------------------------------------------------------------
-// Direct Yahoo Finance API calls (bypasses yahoo-finance2 library's
-// cookie/crumb flow which itself gets rate-limited)
-// ---------------------------------------------------------------------------
-
-/** Fetch a stock quote using Yahoo's v6/v7 quote endpoint directly. */
 async function directYahooQuote(symbol: string): Promise<any> {
-	// Try the v8 endpoint first (no crumb needed), fall back to v6
 	const urls = [
 		`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`,
 		`https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`,
 	];
-
 	for (const url of urls) {
 		try {
-			const res = await axios.get(url, {
-				headers: YAHOO_HEADERS,
-				timeout: 10000,
-			});
-
-			const result = res.data?.chart?.result?.[0];
-			if (!result) continue;
-
-			const meta = result.meta;
+			const res = await axios.get(url, { headers: YAHOO_HEADERS, timeout: 8000 });
+			const meta = res.data?.chart?.result?.[0]?.meta;
+			if (!meta) continue;
 			return {
 				symbol: meta.symbol || symbol,
 				longName: meta.longName || meta.shortName || symbol,
 				regularMarketPrice: meta.regularMarketPrice ?? 0,
 				regularMarketPreviousClose: meta.chartPreviousClose ?? meta.previousClose ?? 0,
-				regularMarketChangePercent:
-					meta.regularMarketPrice && meta.chartPreviousClose
-						? ((meta.regularMarketPrice - meta.chartPreviousClose) /
-								meta.chartPreviousClose) *
-							100
-						: 0,
+				regularMarketChangePercent: meta.regularMarketPrice && meta.chartPreviousClose ? ((meta.regularMarketPrice - meta.chartPreviousClose) / meta.chartPreviousClose) * 100 : 0,
 			};
-		} catch (err: any) {
-			if (err.response?.status === 429) {
-				throw err; // Let the retry/rate-limit handler deal with it
-			}
-			// Try next URL
-			continue;
-		}
+		} catch (err: any) { continue; }
 	}
-
-	throw new Error("All Yahoo quote endpoints failed for " + symbol);
+	throw new Error("Quote failed for " + symbol);
 }
 
-/** Search stocks using Yahoo's search endpoints with multiple fallbacks. */
 async function directYahooSearch(query: string): Promise<any[]> {
-	// Strategy 1: Standard Search
-	try {
-        console.log(`[Search] Searching for: ${query}`);
-		const res = await axios.get("https://query1.finance.yahoo.com/v1/finance/search", {
-			params: {
-				q: query,
-				quotesCount: 8,
-				newsCount: 0,
-			},
-			headers: YAHOO_HEADERS,
-			timeout: 8000,
-		});
-		const quotes = res.data?.quotes || [];
-        console.log(`[Search] Found ${quotes.length} results`);
-		if (quotes.length > 0) return quotes;
-	} catch (err: any) {
-		console.error(`[Search] Primary search failed for "${query}":`, err.message);
-	}
-
-	// Strategy 2: Mobile/Autoc Search (Alternate endpoint)
-	try {
-		const res = await axios.get("https://autoc.finance.yahoo.com/autoc", {
-			params: { query, region: '1', lang: 'en' },
-			headers: YAHOO_HEADERS,
-			timeout: 5000,
-		});
-		const quotes = res.data?.ResultSet?.Result || [];
-		if (quotes.length > 0) return quotes;
-	} catch (err) {
-        // quiet fail
-	}
-
-	// Strategy 1b: Try the autocomplete endpoint (sometimes more reliable)
-	try {
-		const res = await axios.get(`https://query1.finance.yahoo.com/v1/finance/autocomplete`, {
-			params: { query, lang: 'en' },
-			headers: YAHOO_HEADERS,
-			timeout: 5000,
-		});
-		const results = res.data?.ResultSet?.Result || [];
-		if (results.length > 0) {
-			return results.map((r: any) => ({
-				symbol: r.symbol,
-				shortname: r.name,
-				longname: r.name,
-				quoteType: r.typeDisp,
-				exchange: r.exchDisp
-			}));
-		}
-	} catch (err) {
-		// ignore
-	}
+    if (!query || query.length < 1) return [];
 	const results: any[] = [];
 
-	// Strategy 3: Alpha Vantage Fallback
+	// 1. Alpha Vantage Symbol Search (Most reliable on Cloud)
 	try {
-        if (process.env.STOTRA_ALPHAVANTAGE_API) {
-            console.log(`[Search] Trying Alpha Vantage for: ${query}`);
+        const avKey = process.env.STOTRA_ALPHAVANTAGE_API;
+        if (avKey && avKey.length > 5) {
             const res = await axios.get(`https://www.alphavantage.co/query`, {
-                params: {
-                    function: 'SYMBOL_SEARCH',
-                    keywords: query,
-                    apikey: process.env.STOTRA_ALPHAVANTAGE_API
-                },
+                params: { function: 'SYMBOL_SEARCH', keywords: query, apikey: avKey },
                 timeout: 5000
             });
             const matches = res.data?.bestMatches || [];
@@ -205,236 +97,77 @@ async function directYahooSearch(query: string): Promise<any[]> {
                 }));
             }
         }
-	} catch (err) {
-        // quiet fail
-	}
+	} catch (_) { }
 
-	// Strategy 4: Try to look up the query directly as a symbol via v8/chart
-	// (this endpoint is the most reliable and almost never goes down)
-	const possibleSymbols = [query.toUpperCase()];
-	// Also try common suffixes for the query
-	if (!query.includes(".") && query.length <= 5) {
-		possibleSymbols.push(query.toUpperCase());
-	}
+	// 2. Direct Symbol Ticker Check (Immediate match)
+    const ticker = query.toUpperCase().trim();
+    if (ticker.length <= 5 && !ticker.includes(" ")) {
+        try {
+            const res = await axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}`, {
+                params: { range: "1d", interval: "1d" },
+                headers: YAHOO_HEADERS,
+                timeout: 4000,
+            });
+            const meta = res.data?.chart?.result?.[0]?.meta;
+            if (meta && meta.regularMarketPrice) {
+                results.push({
+                    symbol: meta.symbol || ticker,
+                    shortname: meta.shortName || ticker,
+                    longname: meta.longName || ticker,
+                    quoteType: meta.instrumentType || "EQUITY",
+                    exchange: meta.exchangeName || ""
+                });
+            }
+        } catch (_) { }
+    }
 
-	for (const sym of possibleSymbols) {
-		try {
-			const res = await axios.get(
-				`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}`,
-				{
-					params: { range: "1d", interval: "1d" },
-					headers: YAHOO_HEADERS,
-					timeout: 5000,
-				},
-			);
-			const meta = res.data?.chart?.result?.[0]?.meta;
-			if (meta && meta.regularMarketPrice) {
-				results.push({
-					symbol: meta.symbol || sym,
-					shortname: meta.shortName || meta.longName || sym,
-					longname: meta.longName || meta.shortName || sym,
-					quoteType: meta.instrumentType || "EQUITY",
-					exchange: meta.exchangeName || "",
-				});
-			}
-		} catch (_) {
-			// Symbol doesn't exist, that's fine
-		}
-	}
+	// 3. Last Resort: Standard Search
+    try {
+        const res = await axios.get("https://query1.finance.yahoo.com/v1/finance/search", {
+            params: { q: query, quotesCount: 6, newsCount: 0 },
+            headers: YAHOO_HEADERS,
+            timeout: 5000,
+        });
+        const quotes = res.data?.quotes || [];
+        if (quotes.length > 0) return quotes;
+    } catch (_) { }
 
 	return results;
 }
 
-// ---------------------------------------------------------------------------
-// Exported functions
-// ---------------------------------------------------------------------------
-
 export const fetchStockData = async (symbol: string): Promise<any> => {
 	const cacheKey = symbol + "-quote";
-
-	// 1. Fresh cache hit
-	if (stockCache.has(cacheKey)) {
-		return stockCache.get(cacheKey);
-	}
-
+	if (stockCache.has(cacheKey)) return stockCache.get(cacheKey);
 	try {
-		// Use direct API call with retry, queued through the throttle
-		const stockData = await throttledYahooCall(() =>
-			withRetry(() => directYahooQuote(symbol), `quote:${symbol}`),
-		);
-
+		const stockData = await throttledYahooCall(() => withRetry(() => directYahooQuote(symbol), `quote:${symbol}`));
 		stockCache.set(cacheKey, stockData);
 		staleCache.set(cacheKey, stockData);
 		return stockData;
 	} catch (err: any) {
-		// Fallback: try the yahoo-finance2 library (it may have cached crumbs)
-		try {
-			const quote = await yahooFinance.quoteCombine(symbol, {
-				fields: [
-					"regularMarketPrice",
-					"regularMarketChangePercent",
-					"longName",
-					"regularMarketPreviousClose",
-				],
-			});
-			const stockData = {
-				symbol,
-				longName: quote.longName,
-				regularMarketPrice: quote.regularMarketPrice,
-				regularMarketPreviousClose: quote.regularMarketPreviousClose,
-				regularMarketChangePercent: quote.regularMarketChangePercent,
-			};
-			stockCache.set(cacheKey, stockData);
-			staleCache.set(cacheKey, stockData);
-			return stockData;
-		} catch (_) {
-			// ignore library fallback error
-		}
-
-		// Yahoo validation errors sometimes carry the data in err.result
-		if (err.result && Array.isArray(err.result)) {
-			let quote = err.result[0];
-			const stockData = {
-				symbol,
-				longName: quote.longName,
-				regularMarketPrice: quote.regularMarketPrice,
-				regularMarketPreviousClose: quote.regularMarketPreviousClose,
-				regularMarketChangePercent: quote.regularMarketChangePercent,
-			};
-			stockCache.set(cacheKey, stockData);
-			staleCache.set(cacheKey, stockData);
-			return stockData;
-		}
-
-		// Rate-limited – serve stale data if we have it
-		if (isRateLimited(err)) {
-			console.warn(
-				`[Rate-limited] Yahoo Finance 429 for ${symbol}. Serving stale/fallback data.`,
-			);
-			if (staleCache.has(cacheKey)) {
-				return staleCache.get(cacheKey);
-			}
-			return {
-				symbol,
-				longName: symbol,
-				regularMarketPrice: 0,
-				regularMarketPreviousClose: 0,
-				regularMarketChangePercent: 0,
-				_rateLimited: true,
-			};
-		}
-
-		console.error("Error fetching " + symbol + " stock data:", err);
-		throw new Error(err);
+		if (staleCache.has(cacheKey)) return staleCache.get(cacheKey);
+		return { symbol, longName: symbol, regularMarketPrice: 0, regularMarketPreviousClose: 0, regularMarketChangePercent: 0, _error: true };
 	}
 };
 
-export const fetchHistoricalStockData = async (
-	symbol: string,
-	period: "1d" | "5d" | "1m" | "6m" | "YTD" | "1y" | "all" = "1d",
-): Promise<any> => {
-	const periodTerm =
-		period === "1d" || period === "5d" || period === "1m" ? "short" : "long";
-	const cacheKey = symbol + "-historical-" + periodTerm;
-
+export const fetchHistoricalStockData = async (symbol: string, period: string = "1d"): Promise<any> => {
+	const cacheKey = symbol + "-historical-" + period;
+	if (stockCache.has(cacheKey)) return stockCache.get(cacheKey);
 	try {
-		if (stockCache.has(cacheKey)) {
-			return stockCache.get(cacheKey);
-		} else {
-			let formattedData: number[][] = [];
-
-			if (periodTerm == "short") {
-				// If the period is less than 1 month, use intraday data from Alpha Vantage
-				let res = await axios.get(
-					"https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=" +
-						symbol +
-						"&interval=15min&extended_hours=true&outputsize=full&apikey=" +
-						process.env.STOTRA_ALPHAVANTAGE_API,
-				);
-				const alphaData = res.data["Time Series (15min)"];
-
-				if (!alphaData) {
-					return fetchHistoricalStockData(symbol, "6m");
-				}
-
-				formattedData = Object.keys(alphaData)
-					.map((key) => {
-						return [
-							new Date(key).getTime(),
-							parseFloat(alphaData[key]["4. close"]),
-						];
-					})
-					.sort((a, b) => a[0] - b[0]);
-			} else {
-				// Use direct chart API for historical data
-				try {
-					const chartData = await throttledYahooCall(() =>
-						withRetry(async () => {
-							const res = await axios.get(
-								`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`,
-								{
-									params: {
-										period1: "946684800", // 2000-01-01
-										period2: Math.floor(Date.now() / 1000).toString(),
-										interval: "1d",
-									},
-									headers: YAHOO_HEADERS,
-									timeout: 15000,
-								},
-							);
-							return res.data;
-						}, `historical:${symbol}`),
-					);
-
-					const result = chartData?.chart?.result?.[0];
-					if (result && result.timestamp && result.indicators?.quote?.[0]?.close) {
-						const timestamps = result.timestamp;
-						const closes = result.indicators.quote[0].close;
-						formattedData = timestamps
-							.map((ts: number, i: number) => [ts * 1000, closes[i]])
-							.filter((d: any[]) => d[1] != null);
-					}
-				} catch (_directErr) {
-					// Final fallback: use yahoo-finance2 library
-					const yahooData = await throttledYahooCall(() =>
-						yahooFinance.historical(symbol, {
-							period1: "2000-01-01",
-							interval: "1d",
-						}),
-					);
-					formattedData = yahooData.map(
-						(data: { date: { getTime: () => any }; close: any }) => {
-							return [data.date.getTime(), data.close];
-						},
-					);
-				}
-			}
-			stockCache.set(cacheKey, formattedData);
-			return formattedData;
-		}
-	} catch (error: any) {
-		if (isRateLimited(error)) {
-			console.warn(
-				`[Rate-limited] Yahoo Finance 429 for ${symbol} historical. Returning empty data.`,
-			);
-			return [];
-		}
-		console.error("Error fetching " + symbol + " historical data:", error);
-		return null;
-	}
+		const res = await axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`, {
+			params: { range: period, interval: period === "1d" ? "15m" : "1d" },
+			headers: YAHOO_HEADERS,
+			timeout: 10000,
+		});
+		const result = res.data?.chart?.result?.[0];
+		if (!result || !result.timestamp) return [];
+		const timestamps = result.timestamp;
+		const closes = result.indicators?.quote?.[0]?.close || [];
+		const formatted = timestamps.map((ts: number, i: number) => [ts * 1000, closes[i]]).filter((d: any[]) => d[1] != null);
+		stockCache.set(cacheKey, formatted);
+		return formatted;
+	} catch (err) { return []; }
 };
 
-export const searchStocks = async (query: string): Promise<any> => {
-	return throttledYahooCall(() =>
-		withRetry(() => directYahooSearch(query), `search:${query}`),
-	).catch((err) => {
-		if (isRateLimited(err)) {
-			console.warn(
-				`[Rate-limited] Yahoo Finance 429 for search "${query}". Returning empty results.`,
-			);
-			return [];
-		}
-		console.error(err);
-		throw new Error(err);
-	});
+export const searchStocks = async (query: string): Promise<any[]> => {
+	return throttledYahooCall(() => directYahooSearch(query)).catch(() => []);
 };
