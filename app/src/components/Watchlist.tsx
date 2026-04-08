@@ -30,8 +30,15 @@ function Watchlist() {
 	const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
 
 	useEffect(() => {
-		accounts.getWatchlist(false).then((watchlist) => {
-			setWatchlist(watchlist as WatchlistItem[]);
+		accounts.getWatchlist(false).then((data) => {
+			if (Array.isArray(data)) {
+				setWatchlist(data as WatchlistItem[]);
+			} else {
+				setWatchlist([]);
+			}
+			setIsLoading(false);
+		}).catch(() => {
+			setWatchlist([]);
 			setIsLoading(false);
 		});
 	}, []);
@@ -58,7 +65,7 @@ function Watchlist() {
 					</Flex>
 				) : (
 					<Stack spacing={0}>
-						{watchlist.map((stock, i) => (
+						{Array.isArray(watchlist) && watchlist.map((stock, i) => (
 							<Flex
 								gap={3}
 								key={i}

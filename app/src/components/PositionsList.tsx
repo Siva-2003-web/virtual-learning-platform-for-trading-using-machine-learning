@@ -23,8 +23,15 @@ function PositionsList() {
 	const [positions, setPositions] = useState<Position[]>([]);
 
 	useEffect(() => {
-		accounts.getPortfolio().then(({ positions }) => {
-			setPositions(positions);
+		accounts.getPortfolio().then((data) => {
+			if (data && Array.isArray(data.positions)) {
+				setPositions(data.positions);
+			} else {
+				setPositions([]);
+			}
+			setIsLoading(false);
+		}).catch(() => {
+			setPositions([]);
 			setIsLoading(false);
 		});
 	}, []);
@@ -51,7 +58,7 @@ function PositionsList() {
 					</Flex>
 				) : (
 					<Stack spacing={0}>
-						{positions.map((position) => {
+						{Array.isArray(positions) && positions.map((position) => {
 							return (
 								<Flex
 									key={position.purchaseDate.toString()}
