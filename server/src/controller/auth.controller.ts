@@ -30,21 +30,17 @@ const signup = (req: Request, res: Response) => {
 
 	newUser
 		.save()
-		.then((user: { save: () => Promise<any> }) => {
+		.then((user) => {
 			if (user) {
-				user
-					.save()
-					.then(() => {
-						// Use username as email if it contains '@'
-						if (req.body.username.includes('@')) {
-							sendWelcomeEmail(req.body.username).catch(console.error);
-						}
-
-						res.send({ message: "User was registered successfully!" });
-					})
-					.catch((err: Error) => {
-						res.status(500).send({ message: err.message });
+				// Use username as email if it contains '@'
+				if (req.body.username.includes("@")) {
+					console.log(`[Signup] Triggering Welcome Email for: ${req.body.username}`);
+					sendWelcomeEmail(req.body.username).catch((err) => {
+						console.error("[Signup] Welcome Email Error:", err);
 					});
+				}
+
+				res.send({ message: "User was registered successfully!" });
 			}
 		})
 		.catch((err: any) => {

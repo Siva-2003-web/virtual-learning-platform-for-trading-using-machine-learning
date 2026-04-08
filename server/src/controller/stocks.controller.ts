@@ -91,7 +91,10 @@ const buyStock = async (req: Request, res: Response) => {
 					if (user) {
 						// Send Buy Trade Email
 						if (user.username!.includes('@')) {
-							sendTradeConfirmationEmail(user.username!, 'BUY', symbol, quantity, price, user.cash!).catch(console.error);
+							console.log(`[Trade] Triggering Buy Email for: ${user.username}`);
+							sendTradeConfirmationEmail(user.username!, 'BUY', symbol, quantity, price, user.cash!).catch((err) => {
+								console.error("[Trade] Buy Email Error:", err);
+							});
 						}
 
 						res.status(200).send({ message: "Stock was bought successfully!" });
@@ -169,7 +172,10 @@ const sellStock = async (req: Request, res: Response) => {
 				if (user) {
 					// Send Sell Trade Email
 					if (user.username!.includes('@')) {
-						sendTradeConfirmationEmail(user.username!, 'SELL', symbol, quantity, price, user.cash!).catch(console.error);
+						console.log(`[Trade] Triggering Sell Email for: ${user.username}`);
+						sendTradeConfirmationEmail(user.username!, 'SELL', symbol, quantity, price, user.cash!).catch((err) => {
+							console.error("[Trade] Sell Email Error:", err);
+						});
 					}
 
 					res.send({ message: "Stock was sold successfully!" });
