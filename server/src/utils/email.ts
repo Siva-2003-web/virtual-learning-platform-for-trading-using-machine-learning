@@ -1,5 +1,12 @@
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import dns from 'dns';
+
+// Force Node.js to prefer IPv4 over IPv6 globally
+if (dns.setDefaultResultOrder) {
+    dns.setDefaultResultOrder('ipv4first');
+}
+
 dotenv.config();
 
 // Create Nodemailer Transporter using your Gmail account
