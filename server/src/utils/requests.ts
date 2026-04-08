@@ -139,20 +139,40 @@ async function directYahooSearch(query: string): Promise<any[]> {
 			const res = await axios.get(url, {
 				params: {
 					q: query,
-					quotesCount: 10,
+					quotesCount: 5,
 					newsCount: 0,
 					enableFuzzyQuery: true,
-					quotesQueryId: "tss_match_phrase_query",
 				},
 				headers: YAHOO_HEADERS,
-				timeout: 8000,
+				timeout: 10000,
 			});
-			const quotes = res.data?.quotes || [];
+			const quotes = res.data?.quotes || res.data?.news || [];
 			if (quotes.length > 0) return quotes;
 		} catch (err: any) {
+			console.warn(`[Search] Primary search failed for "${query}" on ${url}:`, err.message);
 			if (err.response?.status === 429) throw err;
-			// Continue to next fallback
 		}
+	}
+
+	// Strategy 1b: Try the autocomplete endpoint (sometimes more reliable)
+	try {
+		const res = await axios.get(`https://query1.finance.yahoo.com/v1/finance/autocomplete`, {
+			params: { query, lang: 'en' },
+			headers: YAHOO_HEADERS,
+			timeout: 5000,
+		});
+		const results = res.data?.ResultSet?.Result || [];
+		if (results.length > 0) {
+			return results.map((r: any) => ({
+				symbol: r.symbol,
+				shortname: r.name,
+				longname: r.name,
+				quoteType: r.typeDisp,
+				exchange: r.exchDisp
+			}));
+		}
+	} catch (err) {
+		// ignore
 	}
 
 	// Strategy 2: Try to look up the query directly as a symbol via v8/chart

@@ -35,17 +35,24 @@ function SearchBox() {
 	const [results, setResults] = useState<[SearchResult] | null>(null);
 
 	const onKeyDown = (e: KE<HTMLInputElement>) => {
-		if (results == null || results.length < 1) return;
+		if (!Array.isArray(results) || results.length < 1) return;
 
 		if (e.key === "Enter") {
-			navigate(`/stocks/${results![selectedIndex]!.symbol}`);
-			let input: HTMLInputElement = e.target! as HTMLInputElement;
-			input.blur();
+			const selectedStock = results[selectedIndex];
+			if (selectedStock) {
+				navigate(`/stocks/${selectedStock.symbol}`);
+				const input = e.target as HTMLInputElement;
+				input.blur();
+				onClose();
+			}
 		} else if (e.key === "ArrowUp") {
-			setSelectedIndex((selectedIndex - 1) % results!.length);
-			if (selectedIndex === 0) setSelectedIndex(results!.length - 1);
+			e.preventDefault();
+			const nextIndex = selectedIndex <= 0 ? results.length - 1 : selectedIndex - 1;
+			setSelectedIndex(nextIndex);
 		} else if (e.key === "ArrowDown") {
-			setSelectedIndex((selectedIndex + 1) % results!.length);
+			e.preventDefault();
+			const nextIndex = (selectedIndex + 1) % results.length;
+			setSelectedIndex(nextIndex);
 		}
 	};
 
@@ -64,7 +71,7 @@ function SearchBox() {
 					setResults(res.data);
 				})
 				.catch(() => {
-					setResults(null);
+					setResults([]);
 				});
 		}, 300);
 
