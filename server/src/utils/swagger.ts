@@ -2,7 +2,7 @@ import { Express, Request, Response } from "express";
 import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
 import swaggerAutogen from "swagger-autogen";
-import { version } from "../../package.json";
+const version = "1.0.0";
 import dotenv from "dotenv";
 dotenv.config();
 
