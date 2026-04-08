@@ -135,7 +135,7 @@ function SearchBox() {
 					<PopoverBody p={2}>
 						{results.length > 0 ? (
 							<List spacing={0}>
-								{results!.map((stock, i) => {
+								{Array.isArray(results) && results.map((stock, i) => {
 									return (
 										<ListItem
 											key={stock.symbol}
