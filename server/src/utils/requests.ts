@@ -180,14 +180,7 @@ async function directYahooSearch(query: string): Promise<any[]> {
 	} catch (err) {
 		// ignore
 	}
-
-	// Strategy 2: Try to look up the query directly as a symbol via v8/chart
-	// (this endpoint is the most reliable and almost never goes down)
-	const possibleSymbols = [query.toUpperCase()];
-	// Also try common suffixes for the query
-	if (!query.includes(".") && query.length <= 5) {
-		possibleSymbols.push(query.toUpperCase());
-	}
+	const results: any[] = [];
 
 	// Strategy 3: Alpha Vantage Fallback
 	try {
@@ -214,6 +207,39 @@ async function directYahooSearch(query: string): Promise<any[]> {
         }
 	} catch (err) {
         // quiet fail
+	}
+
+	// Strategy 4: Try to look up the query directly as a symbol via v8/chart
+	// (this endpoint is the most reliable and almost never goes down)
+	const possibleSymbols = [query.toUpperCase()];
+	// Also try common suffixes for the query
+	if (!query.includes(".") && query.length <= 5) {
+		possibleSymbols.push(query.toUpperCase());
+	}
+
+	for (const sym of possibleSymbols) {
+		try {
+			const res = await axios.get(
+				`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}`,
+				{
+					params: { range: "1d", interval: "1d" },
+					headers: YAHOO_HEADERS,
+					timeout: 5000,
+				},
+			);
+			const meta = res.data?.chart?.result?.[0]?.meta;
+			if (meta && meta.regularMarketPrice) {
+				results.push({
+					symbol: meta.symbol || sym,
+					shortname: meta.shortName || meta.longName || sym,
+					longname: meta.longName || meta.shortName || sym,
+					quoteType: meta.instrumentType || "EQUITY",
+					exchange: meta.exchangeName || "",
+				});
+			}
+		} catch (_) {
+			// Symbol doesn't exist, that's fine
+		}
 	}
 
 	return results;
