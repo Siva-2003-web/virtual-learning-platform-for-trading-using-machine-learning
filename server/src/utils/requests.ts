@@ -189,30 +189,31 @@ async function directYahooSearch(query: string): Promise<any[]> {
 		possibleSymbols.push(query.toUpperCase());
 	}
 
-	const results: any[] = [];
-	for (const sym of possibleSymbols) {
-		try {
-			const res = await axios.get(
-				`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}`,
-				{
-					params: { range: "1d", interval: "1d" },
-					headers: YAHOO_HEADERS,
-					timeout: 5000,
-				},
-			);
-			const meta = res.data?.chart?.result?.[0]?.meta;
-			if (meta && meta.regularMarketPrice) {
-				results.push({
-					symbol: meta.symbol || sym,
-					shortname: meta.shortName || meta.longName || sym,
-					longname: meta.longName || meta.shortName || sym,
-					quoteType: meta.instrumentType || "EQUITY",
-					exchange: meta.exchangeName || "",
-				});
-			}
-		} catch (_) {
-			// Symbol doesn't exist, that's fine
-		}
+	// Strategy 3: Alpha Vantage Fallback
+	try {
+        if (process.env.STOTRA_ALPHAVANTAGE_API) {
+            console.log(`[Search] Trying Alpha Vantage for: ${query}`);
+            const res = await axios.get(`https://www.alphavantage.co/query`, {
+                params: {
+                    function: 'SYMBOL_SEARCH',
+                    keywords: query,
+                    apikey: process.env.STOTRA_ALPHAVANTAGE_API
+                },
+                timeout: 5000
+            });
+            const matches = res.data?.bestMatches || [];
+            if (matches.length > 0) {
+                return matches.map((m: any) => ({
+                    symbol: m['1. symbol'],
+                    shortname: m['2. name'],
+                    longname: m['2. name'],
+                    quoteType: 'EQUITY',
+                    exchange: m['4. region']
+                }));
+            }
+        }
+	} catch (err) {
+        // quiet fail
 	}
 
 	return results;

@@ -141,6 +141,39 @@ function yahooNews(symbol: string): Promise<any> {
 			}
 		}
 
+        // Strategy 2: Try Legacy Yahoo RSS (almost never blocked)
+        try {
+            console.log(`[News] Trying Legacy RSS for "${symbol}"`);
+            const rssUrl = symbol === "" 
+                ? "https://finance.yahoo.com/news/rssindex" 
+                : `https://finance.yahoo.com/rss/headline?s=${symbol}`;
+            
+            const res = await axios.get(rssUrl, { timeout: 8000 });
+            // Simple regex parser for RSS items (faster than XML parser on free tier)
+            const items = res.data.match(/<item>([\s\S]*?)<\/item>/g) || [];
+            const news = items.slice(0, 10).map((item: string) => {
+                const title = item.match(/<title>([\s\S]*?)<\/title>/)?.[1] || "";
+                const link = item.match(/<link>([\s\S]*?)<\/link>/)?.[1] || "";
+                const pubDate = item.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1] || "";
+                const source = item.match(/<source[\s\S]*?>([\s\S]*?)<\/source>/)?.[1] || "Yahoo Finance";
+                
+                return {
+                    title: title.replace("<![CDATA[", "").replace("]]>", ""),
+                    publishedAt: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
+                    source: source,
+                    sourceUrl: link,
+                    symbols: [symbol],
+                    description: ""
+                };
+            });
+            if (news.length > 0) {
+                cache.set(symbol + "-news", news);
+                return news;
+            }
+        } catch (rssErr) {
+            console.warn(`[News] RSS Fallback failed:`, rssErr);
+        }
+
 		// All URLs failed
 		throw lastError || new Error("All news URLs failed");
 	}).catch((err: any) => {
