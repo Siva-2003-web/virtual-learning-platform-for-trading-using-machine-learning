@@ -140,7 +140,14 @@ function SearchBox() {
 					_focus={{ boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}
 				>
 					<PopoverBody p={2}>
-						{results.length > 0 ? (
+						{query.length > 0 && results === null ? (
+							<Box p={4} textAlign="center">
+								<Spinner size="sm" color="cyan.500" mb={2} />
+								<Text color="gray.500" fontSize="xs">
+									Searching for "{query}"...
+								</Text>
+							</Box>
+						) : results?.length && results.length > 0 ? (
 							<List spacing={0}>
 								{Array.isArray(results) && results.map((stock, i) => {
 									return (

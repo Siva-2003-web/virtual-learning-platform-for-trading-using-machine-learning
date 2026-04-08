@@ -128,30 +128,36 @@ async function directYahooQuote(symbol: string): Promise<any> {
 
 /** Search stocks using Yahoo's search endpoints with multiple fallbacks. */
 async function directYahooSearch(query: string): Promise<any[]> {
-	// Strategy 1: Try v1/finance/search (may be down)
-	const searchUrls = [
-		"https://query1.finance.yahoo.com/v1/finance/search",
-		"https://query2.finance.yahoo.com/v1/finance/search",
-	];
+	// Strategy 1: Standard Search
+	try {
+        console.log(`[Search] Searching for: ${query}`);
+		const res = await axios.get("https://query1.finance.yahoo.com/v1/finance/search", {
+			params: {
+				q: query,
+				quotesCount: 8,
+				newsCount: 0,
+			},
+			headers: YAHOO_HEADERS,
+			timeout: 8000,
+		});
+		const quotes = res.data?.quotes || [];
+        console.log(`[Search] Found ${quotes.length} results`);
+		if (quotes.length > 0) return quotes;
+	} catch (err: any) {
+		console.error(`[Search] Primary search failed for "${query}":`, err.message);
+	}
 
-	for (const url of searchUrls) {
-		try {
-			const res = await axios.get(url, {
-				params: {
-					q: query,
-					quotesCount: 5,
-					newsCount: 0,
-					enableFuzzyQuery: true,
-				},
-				headers: YAHOO_HEADERS,
-				timeout: 10000,
-			});
-			const quotes = res.data?.quotes || res.data?.news || [];
-			if (quotes.length > 0) return quotes;
-		} catch (err: any) {
-			console.warn(`[Search] Primary search failed for "${query}" on ${url}:`, err.message);
-			if (err.response?.status === 429) throw err;
-		}
+	// Strategy 2: Mobile/Autoc Search (Alternate endpoint)
+	try {
+		const res = await axios.get("https://autoc.finance.yahoo.com/autoc", {
+			params: { query, region: '1', lang: 'en' },
+			headers: YAHOO_HEADERS,
+			timeout: 5000,
+		});
+		const quotes = res.data?.ResultSet?.Result || [];
+		if (quotes.length > 0) return quotes;
+	} catch (err) {
+        // quiet fail
 	}
 
 	// Strategy 1b: Try the autocomplete endpoint (sometimes more reliable)
