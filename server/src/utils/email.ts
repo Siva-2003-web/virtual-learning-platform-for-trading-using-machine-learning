@@ -12,9 +12,7 @@ dotenv.config();
 
 // Create Nodemailer Transporter using your Gmail account
 const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true, // Use SSL
+    service: 'gmail',
     auth: {
         user: process.env.GMAIL_USER,
         pass: process.env.GMAIL_APP_PASSWORD,
@@ -22,14 +20,11 @@ const transporter = nodemailer.createTransport({
     tls: {
         rejectUnauthorized: false
     },
-    // PERMANENT FIX: Force IPv4 lookup only to bypass Render IPv6 issues
-    lookup: (hostname: string, options: any, callback: any) => {
-        return dns.lookup(hostname, { family: 4 }, callback);
-    },
-    connectionTimeout: 15000,
-    greetingTimeout: 15000,
-    socketTimeout: 15000
-} as any);
+    // Maximum stability for Cloud Platforms
+    connectionTimeout: 20000,
+    greetingTimeout: 20000,
+    socketTimeout: 20000
+});
 
 /**
  * Sends a hyper-premium welcome or account creation email
