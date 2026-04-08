@@ -22,11 +22,13 @@ const transporter = nodemailer.createTransport({
     tls: {
         rejectUnauthorized: false
     },
-    // Force IPv4 to avoid ENETUNREACH errors on cloud platforms
-    family: 4, 
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 10000
+    // PERMANENT FIX: Force IPv4 lookup only to bypass Render IPv6 issues
+    lookup: (hostname: string, options: any, callback: any) => {
+        return dns.lookup(hostname, { family: 4 }, callback);
+    },
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 15000
 } as any);
 
 /**
