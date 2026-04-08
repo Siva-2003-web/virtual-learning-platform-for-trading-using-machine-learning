@@ -191,7 +191,7 @@ function Leaderboard() {
 						</Tr>
 					</Thead>
 					<Tbody>
-						{leaderboard.map((user, index) => (
+						{Array.isArray(leaderboard) && leaderboard.map((user, index) => (
 							<Tr
 								key={index}
 								_hover={{ bg: "rgba(255,255,255,0.02)" }}

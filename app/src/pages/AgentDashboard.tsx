@@ -549,7 +549,7 @@ export default function AgentDashboard() {
 										</Tr>
 									</Thead>
 									<Tbody>
-										{state.recentSignals.map((sig, i) => (
+										{Array.isArray(state.recentSignals) && state.recentSignals.map((sig, i) => (
 											<Tr key={i}>
 												<Td fontWeight="bold">{sig.symbol}</Td>
 												<Td>
@@ -621,7 +621,7 @@ export default function AgentDashboard() {
 										</Tr>
 									</Thead>
 									<Tbody>
-										{state.portfolio.positions.map((pos, i) => {
+										{Array.isArray(state.portfolio.positions) && state.portfolio.positions.map((pos, i) => {
 											const cp = pos.currentPrice ?? pos.entryPrice;
 											const pnl = (cp - pos.entryPrice) * pos.quantity;
 											const pnlPct =
@@ -683,7 +683,7 @@ export default function AgentDashboard() {
 										</Tr>
 									</Thead>
 									<Tbody>
-										{state.recentTrades.slice(0, 50).map((trade) => (
+										{Array.isArray(state.recentTrades) && state.recentTrades.slice(0, 50).map((trade) => (
 											<Tr key={trade.id}>
 												<Td fontSize="xs" whiteSpace="nowrap">
 													{new Date(trade.timestamp).toLocaleString()}
@@ -1112,7 +1112,7 @@ export default function AgentDashboard() {
 														</Tr>
 													</Thead>
 													<Tbody>
-														{backtestResult.trades
+														{Array.isArray(backtestResult.trades) && backtestResult.trades
 															.slice(0, 100)
 															.map((trade) => (
 																<Tr key={trade.id}>
@@ -1186,7 +1186,7 @@ export default function AgentDashboard() {
 											</Tr>
 										</Thead>
 										<Tbody>
-											{state.backtestResults.map((bt, i) => (
+											{Array.isArray(state.backtestResults) && state.backtestResults.map((bt, i) => (
 												<Tr key={i}>
 													<Td>
 														<Badge variant="outline">{bt.strategyName}</Badge>
@@ -1252,7 +1252,7 @@ export default function AgentDashboard() {
 								</Flex>
 							)}
 
-							{chatMessages.map((msg, i) => (
+							{Array.isArray(chatMessages) && chatMessages.map((msg, i) => (
 								<Flex
 									key={i}
 									justify={msg.role === "user" ? "flex-end" : "flex-start"}

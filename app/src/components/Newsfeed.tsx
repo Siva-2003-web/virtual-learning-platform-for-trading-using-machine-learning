@@ -162,7 +162,7 @@ function Newsfeed(props: { symbol: string }) {
 						</CardBody>
 					</Link>
 
-					{item.symbols.length > 0 && (
+					{Array.isArray(item.symbols) && item.symbols.length > 0 && (
 						<CardFooter
 							pt={0}
 							pb={4}
