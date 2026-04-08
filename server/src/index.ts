@@ -1,7 +1,7 @@
-import morgan from "morgan";
-import cors from "cors";
+const morgan = require("morgan");
+const cors = require("cors");
 const { rateLimit } = require("express-rate-limit");
-import express, { Express, Request, Response } from "express";
+import express from "express";
 import dotenv from "dotenv";
 dotenv.config();
 import yahooFinance from "yahoo-finance2";
@@ -20,8 +20,8 @@ try {
 const { swaggerDocs } = require("./utils/swagger");
 
 // Database
-import "./utils/db";
-import "./models/user.model";
+require("./utils/db");
+require("./models/user.model");
 
 // Middleware
 app.use(cors());
@@ -31,14 +31,14 @@ app.use(express.json());
 // Ratelimiting
 const apiLimiter = rateLimit({
 	windowMs: 15 * 60 * 1000, // 15 minutes
-	max: 250, // Limit each IP
+	max: 500, // Increased limit for production
 	standardHeaders: true, 
 	legacyHeaders: false, 
 });
 
 const createAccountLimiter = rateLimit({
 	windowMs: 60 * 60 * 1000, // 1 hour
-	max: 5, 
+	max: 10, 
 	message: "Too many accounts created from this IP, please try again after an hour",
 	standardHeaders: true, 
 	legacyHeaders: false, 
@@ -52,7 +52,7 @@ const PORT: number = parseInt(process.env.PORT || "10000");
 // REST Routes
 app.use(require("./routes"));
 
-app.listen(PORT, async () => {
+app.listen(PORT, () => {
 	console.log(`Server listening on port ${PORT}`);
 	swaggerDocs(app, PORT);
 });
