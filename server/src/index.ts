@@ -9,6 +9,7 @@ import yahooFinance from "yahoo-finance2";
 
 // Config/initialization
 const app = express();
+app.set("trust proxy", 1);
 dotenv.config();
 
 // Suppress Yahoo Finance survey notices and reduce validation noise
