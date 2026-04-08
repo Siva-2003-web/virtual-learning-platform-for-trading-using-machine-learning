@@ -32,13 +32,21 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch event: Network-first approach for better reliability
+// Fetch event: Network-first approach with JSON fallback for API
 self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(event.request).catch(async () => {
       const cached = await caches.match(event.request);
       if (cached) return cached;
-      // If no match, return a generic error response instead of undefined
+      
+      // If it's an API call, return a JSON error instead of plain text
+      if (event.request.url.includes("/api/")) {
+        return new Response(JSON.stringify({ error: 'Offline', status: 503 }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      
       return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
     })
   );
