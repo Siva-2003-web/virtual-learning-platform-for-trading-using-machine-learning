@@ -34,6 +34,12 @@ self.addEventListener('activate', (event) => {
 
 // Fetch event: serve from cache if available, else network
 self.addEventListener('fetch', (event) => {
+  // Network-first for API requests, skip cache entirely
+  if (event.request.url.includes("/api")) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((response) => {
       return response || fetch(event.request);
