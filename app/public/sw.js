@@ -32,17 +32,11 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch event: serve from cache if available, else network
+// Fetch event: Network-first approach for better reliability in development
 self.addEventListener('fetch', (event) => {
-  // Network-first for API requests, skip cache entirely
-  if (event.request.url.includes("/api")) {
-    event.respondWith(fetch(event.request));
-    return;
-  }
-
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
+    fetch(event.request).catch(() => {
+      return caches.match(event.request);
     })
   );
 });
