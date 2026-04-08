@@ -52,8 +52,9 @@ function StockView() {
 
 	useEffect(() => {
 		if (tokens.isAuthenticated()) {
-			accounts.getWatchlist(true).then((res: any[]) => {
-				setOnWatchlist(res.some((stock) => stock.symbol === symbol));
+			accounts.getWatchlist(true).then((res) => {
+				const list = Array.isArray(res) ? res : [];
+				setOnWatchlist(list.some((stock: any) => stock.symbol === symbol));
 			});
 		}
 

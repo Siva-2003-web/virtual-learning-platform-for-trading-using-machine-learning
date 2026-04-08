@@ -45,7 +45,8 @@ function Leaderboard() {
 		axios
 			.get("/api/user/leaderboard")
 			.then((res) => {
-				setLeaderboard(res.data.users);
+				const users = res.data && Array.isArray(res.data.users) ? res.data.users : [];
+				setLeaderboard(users);
 				setIsLoading(false);
 			})
 			.catch((err) => {

@@ -32,11 +32,14 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch event: Network-first approach for better reliability in development
+// Fetch event: Network-first approach for better reliability
 self.addEventListener('fetch', (event) => {
   event.respondWith(
-    fetch(event.request).catch(() => {
-      return caches.match(event.request);
+    fetch(event.request).catch(async () => {
+      const cached = await caches.match(event.request);
+      if (cached) return cached;
+      // If no match, return a generic error response instead of undefined
+      return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
     })
   );
 });
