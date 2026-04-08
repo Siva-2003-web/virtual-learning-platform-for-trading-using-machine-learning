@@ -26,7 +26,6 @@ import {
 import { Link, useLocation, NavLink } from "react-router-dom";
 import { ChevronLeftIcon, ChevronRightIcon, HamburgerIcon, MoonIcon, StarIcon, SunIcon } from "@chakra-ui/icons";
 import AccountMenu from "./AccountMenu";
-import SearchBox from "./SearchBox";
 import { useSidebar } from "../context/SidebarContext";
 
 export default function Sidebar() {
@@ -157,31 +156,6 @@ export default function Sidebar() {
 					</Flex>
 				</Link>
 
-                {/* Search - show icon only if collapsed */}
-                <Box mb={8}>
-                    {!isCollapsed ? (
-                        <>
-                            <Text fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="2px" mb={4} ml={2}>
-                                Search Market
-                            </Text>
-                            <SearchBox />
-                        </>
-                    ) : (
-                        <VStack>
-                             <Tooltip label="Search Market" placement="right">
-                                <IconButton 
-                                    aria-label="Search" 
-                                    icon={<Text fontSize="xl">🔍</Text>} 
-                                    variant="ghost" 
-                                    onClick={toggleSidebar} 
-                                    _hover={{ bg: "rgba(255,255,255,0.05)" }}
-                                    borderRadius="14px"
-                                />
-                             </Tooltip>
-                        </VStack>
-                    )}
-                </Box>
-
 				<Box flex="1">
                     {!isCollapsed && (
                         <Text fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="2px" mb={4} ml={2}>
@@ -311,9 +285,6 @@ export default function Sidebar() {
                         </Flex>
 					</DrawerHeader>
 					<DrawerBody px={4}>
-                        <Box mb={6}>
-                            <SearchBox />
-                        </Box>
 						<NavItems />
 					</DrawerBody>
 					<DrawerFooter borderTopWidth="1px" borderColor="rgba(255,255,255,0.06)" p={6}>
