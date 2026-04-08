@@ -13,8 +13,13 @@ const transporter = nodemailer.createTransport({
     },
     tls: {
         rejectUnauthorized: false
-    }
-});
+    },
+    // Force IPv4 to avoid ENETUNREACH errors on cloud platforms
+    family: 4, 
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 10000
+} as any);
 
 /**
  * Sends a hyper-premium welcome or account creation email
