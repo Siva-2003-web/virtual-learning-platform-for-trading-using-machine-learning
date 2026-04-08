@@ -47,7 +47,7 @@ const createAccountLimiter = rateLimit({
 app.use("/api/", apiLimiter);
 app.use("/api/auth/signup", createAccountLimiter);
 
-const PORT: number = parseInt(process.env.PORT || "10000");
+const PORT: number = parseInt(process.env.PORT || "3010");
 
 // REST Routes
 app.use(require("./routes"));

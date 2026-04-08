@@ -8,8 +8,8 @@ export default defineConfig({
 		host: "0.0.0.0",
 		proxy: {
 			"/api": {
-				target: "http://0.0.0.0:3010",
-				changeOrigin: false,
+				target: "http://localhost:3010",
+				changeOrigin: true,
 				secure: false,
 				ws: true,
 			},
