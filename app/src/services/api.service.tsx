@@ -1,8 +1,14 @@
 import axios from "axios";
 import tokens from "./tokens.service";
 
+// In production (Vercel), call the Render backend directly.
+// In development, use the local Vite proxy at /api.
+const API_BASE = import.meta.env.PROD
+	? "https://s-stellix-backend.onrender.com/api"
+	: "/api";
+
 const instance = axios.create({
-	baseURL: import.meta.env.VITE_API_URL || "/api",
+	baseURL: API_BASE,
 	headers: {
 		"Content-Type": "application/json",
 	},
