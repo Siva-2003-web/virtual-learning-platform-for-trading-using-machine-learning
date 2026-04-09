@@ -14,7 +14,7 @@ import {
 	Flex,
 	VStack,
 } from "@chakra-ui/react";
-import axios from "axios";
+import api from "../services/api.service";
 
 interface NewsItem {
 	title: string;
@@ -52,8 +52,8 @@ function Newsfeed(props: { symbol: string }) {
 	const [news, setNews] = useState<NewsItem[]>([]);
 
 	useEffect(() => {
-		axios
-			.get("/api/news/" + (props.symbol || ""))
+		api
+			.get("/news/" + (props.symbol || ""))
 			.then((res) => {
 				const data = Array.isArray(res.data) ? res.data : [];
 				setNews(data.slice(0, 9));

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../services/api.service";
 import {
 	Box,
 	Heading,
@@ -42,8 +42,8 @@ function Leaderboard() {
 	const [isLoading, setIsLoading] = useState(true);
 
 	useEffect(() => {
-		axios
-			.get("/api/user/leaderboard")
+		api
+			.get("/user/leaderboard")
 			.then((res) => {
 				const users = res.data && Array.isArray(res.data.users) ? res.data.users : [];
 				setLeaderboard(users);

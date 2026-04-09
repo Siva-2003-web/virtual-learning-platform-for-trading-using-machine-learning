@@ -20,7 +20,7 @@ import {
 	InfoOutlineIcon,
 	ExternalLinkIcon,
 } from "@chakra-ui/icons";
-import axios from "axios";
+import api from "../services/api.service";
 
 // ---------------------------------------------------------------------------
 // Animations
@@ -339,8 +339,8 @@ export default function PriceMovementAnalysis({
 		setLoading(true);
 		setError(false);
 
-		axios
-			.get(`/api/stocks/${symbol}/analysis`)
+		api
+			.get(`/stocks/${symbol}/analysis`)
 			.then((res) => {
 				setAnalysis(res.data);
 				setLoading(false);

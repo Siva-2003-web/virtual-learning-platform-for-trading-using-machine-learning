@@ -10,7 +10,7 @@ import {
 	Text,
 	VStack,
 } from "@chakra-ui/react";
-import axios from "axios";
+import api from "../services/api.service";
 import StockChart from "../components/StockChart";
 import TransactionPane from "../components/TransactionPane";
 import accounts from "../services/accounts.service";
@@ -58,8 +58,8 @@ function StockView() {
 			});
 		}
 
-		axios
-			.get(`/api/stocks/${symbol}/info`)
+		api
+			.get(`/stocks/${symbol}/info`)
 			.then((res) => {
 				setStock({ ...res.data });
 			})
@@ -68,8 +68,8 @@ function StockView() {
 			});
 
 		setLoadingPrediction(true);
-		axios
-			.get(`/api/stocks/${symbol}/predict`)
+		api
+			.get(`/stocks/${symbol}/predict`)
 			.then((res) => {
 				setPrediction(res.data);
 				setLoadingPrediction(false);
