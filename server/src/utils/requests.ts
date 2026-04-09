@@ -149,23 +149,92 @@ export const fetchStockData = async (symbol: string): Promise<any> => {
 	}
 };
 
-export const fetchHistoricalStockData = async (symbol: string, period: string = "1d"): Promise<any> => {
-	const cacheKey = symbol + "-historical-" + period;
-	if (stockCache.has(cacheKey)) return stockCache.get(cacheKey);
+export const fetchHistoricalStockData = async (
+	symbol: string,
+	period: "1d" | "5d" | "1m" | "6m" | "YTD" | "1y" | "all" | string = "1d",
+): Promise<any> => {
+	const periodTerm =
+		period === "1d" || period === "5d" || period === "1m" ? "short" : "long";
+	const cacheKey = symbol + "-historical-" + periodTerm;
+
 	try {
-		const res = await axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`, {
-			params: { range: period, interval: period === "1d" ? "15m" : "1d" },
-			headers: YAHOO_HEADERS,
-			timeout: 10000,
-		});
-		const result = res.data?.chart?.result?.[0];
-		if (!result || !result.timestamp) return [];
-		const timestamps = result.timestamp;
-		const closes = result.indicators?.quote?.[0]?.close || [];
-		const formatted = timestamps.map((ts: number, i: number) => [ts * 1000, closes[i]]).filter((d: any[]) => d[1] != null);
-		stockCache.set(cacheKey, formatted);
-		return formatted;
-	} catch (err) { return []; }
+		if (stockCache.has(cacheKey)) {
+			return stockCache.get(cacheKey);
+		}
+
+		let formattedData: number[][] = [];
+
+		if (periodTerm === "short") {
+			// Use Alpha Vantage intraday data for short periods
+			try {
+				const res = await axios.get(
+					"https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=" +
+						symbol +
+						"&interval=15min&extended_hours=true&outputsize=full&apikey=" +
+						process.env.STOTRA_ALPHAVANTAGE_API,
+				);
+				const alphaData = res.data["Time Series (15min)"];
+
+				if (alphaData) {
+					formattedData = Object.keys(alphaData)
+						.map((key) => [
+							new Date(key).getTime(),
+							parseFloat(alphaData[key]["4. close"]),
+						])
+						.sort((a, b) => a[0] - b[0]);
+				}
+			} catch (_) { }
+
+			// Fallback to Yahoo if Alpha Vantage didn't work
+			if (formattedData.length === 0) {
+				return fetchHistoricalStockData(symbol, "6m");
+			}
+		} else {
+			// Use Yahoo chart API for long periods
+			try {
+				const res = await axios.get(
+					`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`,
+					{
+						params: {
+							period1: "946684800", // 2000-01-01
+							period2: Math.floor(Date.now() / 1000).toString(),
+							interval: "1d",
+						},
+						headers: YAHOO_HEADERS,
+						timeout: 15000,
+					},
+				);
+				const result = res.data?.chart?.result?.[0];
+				if (result && result.timestamp && result.indicators?.quote?.[0]?.close) {
+					const timestamps = result.timestamp;
+					const closes = result.indicators.quote[0].close;
+					formattedData = timestamps
+						.map((ts: number, i: number) => [ts * 1000, closes[i]])
+						.filter((d: any[]) => d[1] != null);
+				}
+			} catch (_) {
+				// Fallback: use yahoo-finance2 library
+				try {
+					const yahooFinance = require("yahoo-finance2").default;
+					const yahooData = await yahooFinance.historical(symbol, {
+						period1: "2000-01-01",
+						interval: "1d",
+					});
+					formattedData = yahooData.map(
+						(data: { date: { getTime: () => any }; close: any }) => {
+							return [data.date.getTime(), data.close];
+						},
+					);
+				} catch (_) { }
+			}
+		}
+
+		stockCache.set(cacheKey, formattedData);
+		return formattedData;
+	} catch (error: any) {
+		console.error("Error fetching " + symbol + " historical data:", error);
+		return [];
+	}
 };
 
 export const searchStocks = async (query: string): Promise<any[]> => {

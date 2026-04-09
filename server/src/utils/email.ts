@@ -10,20 +10,31 @@ if (dns.setDefaultResultOrder) {
 
 dotenv.config();
 
+// Startup verification
+const gmailUser = process.env.GMAIL_USER;
+const gmailPass = process.env.GMAIL_APP_PASSWORD;
+if (!gmailUser || !gmailPass) {
+    console.error('[EMAIL] ⚠️ GMAIL_USER or GMAIL_APP_PASSWORD is NOT set! Emails will NOT be sent.');
+    console.error('[EMAIL] Set these in the Render dashboard under Environment Variables.');
+} else {
+    console.log(`[EMAIL] ✅ Email configured for: ${gmailUser}`);
+}
+
 // Create Nodemailer Transporter using your Gmail account
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
     auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD,
+        user: gmailUser || '',
+        pass: gmailPass || '',
     },
     tls: {
         rejectUnauthorized: false
     },
-    // Maximum stability for Cloud Platforms
-    connectionTimeout: 20000,
-    greetingTimeout: 20000,
-    socketTimeout: 20000
+    connectionTimeout: 30000,
+    greetingTimeout: 30000,
+    socketTimeout: 30000
 });
 
 /**
@@ -59,7 +70,7 @@ export const sendWelcomeEmail = async (userEmail: string) => {
                                             
                                             <!-- CTA Button -->
                                             <div style="text-align: center; margin-bottom: 50px;">
-                                                <a href="http://localhost:5173" style="display: inline-block; padding: 18px 45px; background: #00E5FF; color: #000000; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 16px; box-shadow: 0 8px 25px rgba(0, 229, 255, 0.4); text-transform: uppercase; letter-spacing: 1px;">Initialize Dashboard</a>
+                                                <a href="https://virtual-learning-platform-for-trading-using-machine-pqto87fd7.vercel.app" style="display: inline-block; padding: 18px 45px; background: #00E5FF; color: #000000; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 16px; box-shadow: 0 8px 25px rgba(0, 229, 255, 0.4); text-transform: uppercase; letter-spacing: 1px;">Initialize Dashboard</a>
                                             </div>
 
                                             <!-- Feature List -->
